@@ -17,11 +17,12 @@ export default class Service {
     const data = JSON.stringify({
       username,
       password: this.#hashPassword(password),
-      createdAt: new Date().toString()
+      createdAt: new Date().toISOString()
     }).concat('\n')
 
     fs.appendFile(this.#filename, data)
   }
+  
   async read() { 
     const lines = (await fs.readFile(this.#filename, 'utf8')).split('\n').filter(line => !!line)
     if(!lines.length) return []

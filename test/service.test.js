@@ -1,60 +1,62 @@
 import { it, expect, describe, beforeEach, jest } from '@jest/globals'
 import Service from '../src/service.js'
 import fs from 'node:fs/promises'
-
+import crypto from "node:crypto"
 
 describe('Service Test Suite', () => {
 	let _service
 	const filename = 'testFile.ndjson'
-	beforeEach(() => {
-		_service = new Service({ filename })
-	})
+	const MOCKED_HASH_PWD = 'HASHDEPASSWORD'
 
-	describe('#read', () => {
-		it('Should return an empty array if the file is empty', async () => {
+	describe('#create - spies', () => {
+		beforeEach(() => {
+
+			jest.spyOn(
+				crypto,
+				crypto.createHash.name
+			).mockReturnValue({
+				update: jest.fn().mockReturnThis(),
+				digest: jest.fn().mockReturnValue(MOCKED_HASH_PWD)
+			})
 
 			jest.spyOn(
 				fs,
-				fs.readFile.name
-			).mockResolvedValue('')
+				fs.appendFile.name
+			).mockResolvedValue()
 
-
-			const result = await _service.read()
-			expect(result).toEqual([])
+			_service = new Service({ filename })
 		})
 
-		it('should return users without password if file contains users', async () => {
+		it('should call appendFile with right params',async ()=>{
+			const input = {username: 'test1', password: 'pass1'}
+			const expectedCreateAt = new Date().toISOString()
 
-			// arrange
-			const data = [
-				{
-					username: 'test1',
-					password: 'password1',
-					createdAt: new Date().toISOString()
-				},
-				{
-					username: 'test2',
-					password: 'password2',
-					createdAt: new Date().toISOString()
-				},
-			]
-			// simulando arquivo, transformando pra string e depois para json
-			const fileContent = data
-				.map(line=>JSON.stringify(line).concat('\n')).join('')
-
+			// A
 			jest.spyOn(
-				fs,
-				'readFile'
-			).mockResolvedValue(fileContent);
+				Date.prototype,
+				Date.prototype.toISOString.name
+			).mockReturnValue(expectedCreateAt)
 
-			// action
-			const result = await _service.read()
+			// AA 
+			await _service.create(input)
 
-			// assert
-			const expected = data.map(({password, ...rest})=>({...rest}))
+			// AAA 
+			// toHaveBeenCalledWith = verifica se a função createHash foi chamada com o parametro correto
+			expect(crypto.createHash).toHaveBeenCalledWith('sha256')
 
-			expect(result).toEqual(expected)
+			const hash = crypto.createHash('sha256')
+			expect(hash.update).toHaveBeenCalledWith(input.password)
+			expect(hash.digest).toHaveBeenCalledWith('hex')
 
+			const expected = JSON.stringify({
+				...input,
+				createdAt: expectedCreateAt,
+				password: MOCKED_HASH_PWD
+			}).concat('\n')
+
+			expect(fs.appendFile).toHaveBeenCalledWith(filename, expected)
 		})
 	})
+
+
 })
